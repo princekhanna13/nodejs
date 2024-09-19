@@ -1,0 +1,544 @@
+openapi: 3.0.0
+
+info:
+  contact:
+    name: Crewmeister contact
+    url: https://crewmeister.com/en/contact/
+    email: contact@crewmeister.com
+  title: Crewmeister API
+  x-logo:
+    url:
+      "https://scontent-amt2-1.xx.fbcdn.net/v/t31.0-8/28060872_1755028491215818_4922571113122326580_o.png?\
+      _nc_cat=101&_nc_ht=scontent-amt2-1.xx&oh=f4a6b78f364792e128a5fe8497ebbd0f&oe=5D4319B2"
+    altText: Crewmeister logo
+  version: "2.0"
+  description: >
+    # Introduction
+
+
+    Welcome to the Crewmeister API documentation!
+
+    For an **interactive documentation** check out our [Swagger docs](/swagger.html).
+
+    For a quick example, check out [the example page](/examples.html).
+
+
+    ## How to authenticate
+
+
+    Most API endpoints require a client authentication. The Crewmeister API offers a token-based solution for
+    authentication.
+
+    After a successful authentication, a token is returned that has to be presented in subsequent calls.
+
+
+    There are three authentication types:
+
+    - **User authentication**: This allows the client to act as a certain crewmeister user. The most typical use case.
+
+    - **Crew authentication**: Allows to access certain information from a crew without having to be logged in as as a
+    specific user of this crew. This enables application such as the Terminal Login to show a list of crew members and
+    their current working state.
+
+    - **Admin authentication**: For internal administration cases only, not open for third party apps.
+
+
+    In the future more authentication types might be added. In a single call, a client can be authenticated for none,
+    one or many of the authentication types. E.g., a client  can be authenticated as a user and a crew (eg. while in
+    terminal mode).
+
+
+    ### Obtaining tokens
+
+
+    You can obtain a token by posting the authentication data to the API endpoint for the respective authentication
+    type:
+
+    - User authentication: `/user/token`
+
+    - Crew authentication: `/crew/token`
+
+    - Admin authentication: `/admin/token`
+
+
+    If the authentication was successful, you get back the token. Store it together with the id of the object you
+    authenticated as (e.g., the user id for a user authentication).
+
+
+    ### Passing tokens and ids to the API
+
+
+    For each authentication type, there are three ways to send a **token** (in priority order):
+
+    1. Via query parameter: `cmAuthenticationUserToken` / `cmAuthenticationCrewToken` / `cmAuthenticationAdminToken`
+
+    1. Via HTTP header: `X-cmAuthenticationUserToken` / `X-cmAuthenticationCrewToken` / `X-cmAuthenticationAdminToken`
+
+    1. Via cookie (the HTTP cookie header): `cmAuthenticationUserToken`/ `cmAuthenticationCrewToken` /
+    `cmAuthenticationAdminToken`
+
+
+    When multiple tokens *for the same authentication type* are passed in a single call, the one with the **highest
+    priority** is used for authentication.
+
+
+    In addition to the token, the caller has to send the **id** of the object the token was issued for with each call.
+    Again, there are three ways to do so:
+
+    1. Via query parameter: `cmAuthenticationUserId` / `cmAuthenticationCrewId` / `cmAuthenticationAdminId`
+
+    1. Via HTTP header: `X-cmAuthenticationUserId` / `X-cmAuthenticationCrewId` / `X-cmAuthenticationAdminId`
+
+    1. Via cookie (HTTP cookie header): `cmAuthenticationUserId`/ `cmAuthenticationCrewId` / `cmAuthenticationAdminId`
+
+
+    ## Parameters
+
+
+    The Crewmeister API uses the lower [camelCase](https://en.wikipedia.org/wiki/Camel_case), with initial lowercase
+    letter, style of writing compound words for the parameters (and also for the attributes in the response bodies).
+
+
+    ## Errors
+
+
+    In addition to the standard HTTP status codes to indicate success (2xx) or failure (4xx or 5xx) of the API call, the
+    Crewmeister API also uses **Internal Status Codes** in the body of the response.
+
+    The JSON error response is formatted with the attributes `message`, with the error message, and `statusCode`, with
+    the internal status code.
+
+    Check in the following list for some errors and their possible causes.
+
+    - **Not Found** (`404`): Endpoint not found or no longer available (check typos in the url and if the path parameter
+    are is correctly sent).
+
+    - **Couldn't send reset instructions because no contact was provided.** (`1002`): Provided contact
+    (`userIdentifier`) is incorrect.
+
+    - **Validation error** (`1005`): Incorrect request parameters (check the response body, each validation error has a
+    description and message).
+
+    - **Unauthorized** (`1006`): Caller does not have the necessary permissions to make the request (e.g. not a crew
+    manager or owner), can also be because path is incorrect (check if the path parameters are correct).
+
+    - **Not authenticated. Please sign in.** (`1013`): Incorrect or invalid tokens (check if the token and id pair are
+    correctly sent in the request). Can also be because path is incorrect (check if the path parameters are not blank).
+
+    - **Record was not found** (`1017`): Requested record was not found (record no longer exists/deleted or wrong record
+    identification). Check if ids parameters are correctly sent.
+
+servers:
+  - url: https://api.crewmeister.com/api/v2
+
+security:
+  - headerAuthenticationUserId: []
+    headerAuthenticationUserToken: []
+    headerAuthenticationCrewId: []
+    headerAuthenticationCrewToken: []
+    headerAuthenticationAdminId: []
+    headerAuthenticationAdminToken: []
+  - cookieAuthenticationUserId: []
+    cookieAuthenticationUserToken: []
+  - queryAuthenticationUserId: []
+    queryAuthenticationUserToken: []
+
+tags:
+  - name: Absences
+    description: >
+      Absences are used to signalize periods of time legally away from work, while maintaining the status of employee.
+      There are 5 types of absences:
+        - **Vacation** (`typeId: 1`)
+        - **Sickness** (`typeId: 2`)
+        - **Compensatory time off** (`typeId: 3`)
+        - **Education** (`typeId: 4`)
+        - **Other absence** (`typeId: 5`)
+
+      The `startDayPart` and `endDayPart` parameters are used to store the information on the extent of the absence over
+      the start and end days. The valid values for both parameters are `'morning'` and `'afternoon'`.
+
+
+      | __ABSENCE__                   | `start_day_part` | `end_day_part` |
+
+      | ----------------------------- | ---------------- | -------------- |
+
+      | __Single day__                |                  |                |
+
+      | => Full                       | `'morning'`      | `'afternoon'`  |
+
+      | => Morning                    | `'morning'`      | `'morning'`    |
+
+      | => Afternoon                  | `'afternoon'`    | `'afternoon'`  |
+
+      | __Several days (first/last)__ |                  |                |
+
+      | => Full / Full                | `'morning'`      | `'afternoon'`  |
+
+      | => Full / Morning             | `'morning'`      | `'morning'`    |
+
+      | => Afternoon / Full           | `'afternoon'`    | `'afternoon'`  |
+
+      | => Afternoon / Morning        | `'afternoon'`    | `'morning'`    |
+
+  - name: Authentication
+    description: >
+      The Crewmeister API uses token-based authentications, you can send one (or more) of the 3 types of authentication
+      to each request. For most endpoints the caller being authenticated as a user in the requested crew is enough.
+
+  - name: Bookings
+    description: >
+      The Booking objects are used for internally processing **Timestamps**, **Absences** and **Shifts**. All the
+      calculations make use of bookings, e.g. the employee's effective work time and extra working hours. A Booking can
+      only be created from the outside when the employer wants to change his employee's extra working hours, being able
+      to choose between:
+       - balance correction (`timeAccount: 9`)
+       - payout (`timeAccount: 10`)
+
+  - name: Bug Report
+    description: >
+      Sometimes our Customer Success team feels powerless for not being able to help our employee-app users to solve
+      their local issues. In order for us to be able to simulate the state of the employee-app users locally and
+      try to reproduce any bug that may happen to them, we created the bug-report project that receives their
+      local data, stores it and send it to the employee-app for debugging.
+
+      Regarding this service, you can:
+        - save a report
+        - get all the reports received from a certain user (just the descriptions)
+        - get one requested report completely
+
+  - name: Crew
+    description: >
+      In the Crewmeister's system it is all about crews, the Crew object represents a company and the crew members the
+      employees. A user can be member of 1 or more crews, and for each crew have different roles (owner, manager and
+      member). For some operations is required for the caller to have administrate privileges (role of owner or manager)
+      in the requested crew.
+
+      You can also change the crew settings, being able to:
+        - add employees
+        - add and administrate projects
+        - configure GPS-tracking
+
+  - name: Days
+    description: >
+      There available Day Kinds are:
+        - Work day
+        - No work day
+        - Holiday
+        - Company holiday
+        - Absence
+
+      The **Public Holiday Calendar** is defined by the crew owner in the settings, it contains the selected public
+      holidays (special days). In the settings page there are a list with all the special days in the year for the given
+      country (Germany, Austria or Switzerland), and the crew owner is able to add the ones that are important for the
+      business.
+
+  - name: Export
+    description: >
+      With the export endpoints you are able to see the current salary export configuration and generate spreadsheet
+      exports. This is especially relevant for the payroll accounting.
+
+  - name: Geofence
+    description: >
+      The Geofence object maps a virtual perimeter for a real world geographic area. A geofence region can be set to map
+      to a certain group in which the user clocks in and out.
+
+  - name: Groups
+    description: >
+      Deprecated. It will be removed in the future. See Time category section.
+
+  - name: Members
+    description: >
+      Members are the conection between the **User** and the **Crew** objects. A user can be part of one or more crews,
+      having a different membership for each one.
+
+  - name: Password
+    description: >
+      With the passwords endpoints you are able to update or and request for a password reset.
+
+  - name: Prices and Subscription
+    description: >
+      A Subscription object is created when a user buys one of the Crewmeister's products. The Prices enpoints shows the
+      prices configuration for the available countries, crew sizes and products. You are also able get the price
+      calculation for the given sent products ids, number of employees, payment period and presence or not of a voucher
+      code.
+
+  - name: Rules
+    description: >
+      Break Rules represent the break configurations for the crew, the available options are:
+        - 30 min after 6h
+        - 45min after 9h
+        - 45 min after 46min work
+        - 60 min after 61min work
+
+      The Rounding Rules represents the rounding configuration for the user's time tracking. The available options are:
+        - `id: null`: Working times will not be rounded.
+        - `id: 15updown15updown`: When clocking in and out, the working times are rounded to the
+        nearest 15 minutes. E.g., when the employee clocks in at 10:35, the clock-in time is rounded
+        down to 10:30. If he clocks in at 10:40, the clock-in time is rounded up to 10:45.
+
+  - name: Settings
+    description: >
+      With the Settings endpoints you can fetch a list of all setting definitions and get the values.
+
+  - name: Shifts
+    description: >
+      The Shift object is used to define a working time in the future. It can be an open shift (shifts where you don't
+      know yet which employee is going to take them) or assigned to a member. You can assign open shifts to an employee
+      at any later stage. Employees get automatically informed about new shift plans.
+
+      A shift can have 2 versions:
+        - published (version 1)
+        - draft (version 2)
+      and 4 states:
+        - `PUBLISHED`
+        - `UNPUBLISHED_CREATE`, which defines a new draft.
+        - `UNPUBLISHED_UPDATE`, which defines a draft created to update a published shift.
+        - `UNPUBLISHED_DELETE`, which defines a draft to delete a published shift.
+
+      When the shifts are published the state are automatically changed to `PUBLISHED` and the version to 1. It is also
+      possible to copy shifts in a given origin period (without creating a template) with the copy shift endpoint.
+
+  - name: Template
+    description: >
+      The Template object is used to save the shifts configuration in a given week (fixed duration of 7 days), for being
+      able to use the same configuration later on by applying the template. When the template is applied the shifts in
+      the template are applied for the week as **draft shifts**.
+
+  - name: Time Category
+    description: >
+      The Time category object can represent customers, projects, or activities. You can conduct detailed analyses on the times
+      based on the time categories. A Time category can be of level 1 or 2. It can be activated or deactivated.
+
+  - name: Time Tracking
+    description: >
+      A Timestamp object is created whenever a user clocks in or out, for work or break trackings. Timestamps containing
+      the same `clockInTimestamp` attribute belongs to one **StampChain**.
+
+  - name: Time and Durations
+    description: >
+      With the Time and Durations endpoints you can fetch a list of all duration balances and get a timestamp with the
+      current server time.
+
+  - name: User
+    description: >
+      By signing up a User, a Crew and a Member objects are created.
+
+  - name: Working Time Models
+    description: >
+      The Working time models defines on which days your employees regularly work how many hours.
+
+  - name: Workplaces
+    description: >
+      Different from groups, the Workplace object is related to a working place in the real world. A workplace can be
+      activated or deactivated.
+
+paths:
+  /context:
+    $ref: ./paths/authentication.yaml#/context
+  /user/authentication:
+    $ref: ./paths/authentication.yaml#/user~1authentication
+  /crew/authentication:
+    $ref: ./paths/authentication.yaml#/crew~1authentication
+  /admin/authentication:
+    $ref: ./paths/authentication.yaml#/admin~1authentication
+
+  /sign-up:
+    $ref: ./paths/user.yaml#/sign-up
+  /user:
+    $ref: ./paths/user.yaml#/user
+  /user/{userId}:
+    $ref: ./paths/user.yaml#/user~1{userId}
+  /user/{userId}/memberships:
+    $ref: ./paths/user.yaml#/user~1{userId}~1memberships
+  /request-password-reset:
+    $ref: ./paths/user.yaml#/request-password-reset
+
+  /bug-report/report/new:
+    $ref: ./paths/bug-report.yaml#/bug-report~1report~1new
+  /bug-report/debug/list/{userId}:
+    $ref: ./paths/bug-report.yaml#/bug-report~1debug~1list~1{userId}
+  /bug-report/debug/load/{id}:
+    $ref: ./paths/bug-report.yaml#/bug-report~1debug~1load~1{id}
+
+  /crew/current:
+    $ref: ./paths/crew.yaml#/crew~1current
+  /crew/new:
+    $ref: ./paths/crew.yaml#/crew~1new
+  /crew/{crewId}:
+    $ref: ./paths/crew.yaml#/crew~1{crewId}
+  /crew/{crewId}/user/{userId}:
+    $ref: ./paths/crew.yaml#/crew~1{crewId}~1user~1{userId}
+  /crew/{crewId}/user/{userId}/permissions:
+    $ref: ./paths/crew.yaml#/crew~1{crewId}~1user~1{userId}~1permissions
+  /crew/{crewId}/permission:
+    $ref: ./paths/crew.yaml#/crew~1{crewId}~1permission
+  /crew/{crewId}/settings:
+    $ref: ./paths/crew.yaml#/crew~1{crewId}~1settings
+  /crew/{crewId}/settings/members/{userId}:
+    $ref: ./paths/crew.yaml#/crew~1{crewId}~1settings~1members~1{userId}
+
+  /crew/{crewId}/member:
+    $ref: ./paths/member.yaml#/member
+  /crew/{crewId}/member/{userId}:
+    $ref: ./paths/member.yaml#/member~1{userId}
+  /crew/{crewId}/member/{userId}/enable:
+    $ref: ./paths/member.yaml#/member~1{userId}~1enable
+  /crew/{crewId}/member/{userId}/disable:
+    $ref: ./paths/member.yaml#/member~1{userId}~1disable
+  /crew/{crewId}/invite/with-email:
+    $ref: ./paths/member.yaml#/invite~1with-email
+  /crew/{crewId}/invite/with-login-name:
+    $ref: ./paths/member.yaml#/invite~1with-login-name
+
+  /crew/{crewId}/rounding-rules:
+    $ref: ./paths/rules.yaml#/rounding-rules
+  /crew/{crewId}/break-rules:
+    $ref: ./paths/rules.yaml#/break-rules
+  /crew/{crewId}/working-time-models:
+    $ref: ./paths/working-time-model.yaml#/working-time-models
+
+  /crew/{crewId}/durations:
+    $ref: ./paths/duration.yaml#/durations
+  /crew/{crewId}/duration-balances:
+    $ref: ./paths/duration.yaml#/duration-balances
+
+  /crew/{crewId}/group:
+    $ref: ./paths/group.yaml#/group
+  /crew/{crewId}/group/groupId:
+    $ref: ./paths/group.yaml#/group~1{groupId}
+  /crew/{crewId}/group/groupdId/enable:
+    $ref: ./paths/group.yaml#/group~1{groupId}~1enable
+  /crew/{crewId}/group/groupdId/disable:
+    $ref: ./paths/group.yaml#/group~1{groupId}~1disable
+
+  /crew/{crewId}/time-category:
+    $ref: ./paths/time-category.yaml#/time-category
+  /crew/{crewId}/time-category/{timeCategoryId}:
+    $ref: ./paths/time-category.yaml#/time-category~1{timeCategoryId}
+  /crew/{crewId}/time-category/{timeCategoryId}/enable:
+    $ref: ./paths/time-category.yaml#/time-category~1{timeCategoryId}~1enable
+  /crew/{crewId}/time-category/{timeCategoryId}/disable:
+    $ref: ./paths/time-category.yaml#/time-category~1{timeCategoryId}~1disable
+
+  /crew/{crewId}/workplace:
+    $ref: ./paths/workplace.yaml#/workplace
+  /crew/{crewId}/workplace/{workplaceId}:
+    $ref: ./paths/workplace.yaml#/workplace~1{workplaceId}
+
+  /crew/{crewId}/geofence:
+    $ref: ./paths/geofence.yaml#/geofence
+  /crew/{crewId}/geofence/{geofenceId}:
+    $ref: ./paths/geofence.yaml#/geofence~1{geofenceId}
+
+  /crew/{crewId}/day-kind-calendar:
+    $ref: ./paths/days.yaml#/day-kind-calendar
+  /crew/{crewId}/day-kinds:
+    $ref: ./paths/days.yaml#/day-kinds
+  /crew/{crewId}/public-holiday-calendar:
+    $ref: ./paths/days.yaml#/public-holiday-calendar
+  /crew/{crewId}/public-holiday-calendar/{country}:
+    $ref: ./paths/days.yaml#/public-holiday-calendar~1{country}
+
+  /crew/{crewId}/time-tracking/stamps:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stamps
+  /crew/{crewId}/time-tracking/start-work:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1start-work
+  /crew/{crewId}/time-tracking/stop-work:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stop-work
+  /crew/{crewId}/time-tracking/start-break:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1start-break
+  /crew/{crewId}/time-tracking/stop-break:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stop-break
+  /crew/{crewId}/time-tracking/update-stamp:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1update-stamp
+  /crew/{crewId}/time-tracking/update-break-for-stamps:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1update-break-for-stamps
+  /crew/{crewId}/time-tracking/stamp-chains:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stamp-chains
+  /crew/{crewId}/time-tracking/stamp-chains-force-create:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stamp-chains-force-create
+  /crew/{crewId}/time-tracking/stamp-chain-replace:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stamp-chain-replace
+  /crew/{crewId}/time-tracking/stamp-chain-delete:
+    $ref: ./paths/time-tracking.yaml#/time-tracking~1stamp-chain-delete
+  /crew/{crewId}/bookings:
+    $ref: ./paths/time-tracking.yaml#/bookings
+
+  /crew/{crewId}/workforce-management/settings:
+    $ref: ./paths/settings.yaml#/settings
+  /crew/{crewId}/workforce-management/settings/values:
+    $ref: ./paths/settings.yaml#/settings-values
+  /crew/{crewId}/workforce-management/settings/values/setting-group:
+    $ref: ./paths/settings.yaml#/settings-values-setting-group
+  /crew/{crewId}/workforce-management/settings/values/setting-group/default:
+    $ref: ./paths/settings.yaml#/settings-values-setting-group-default
+
+  /crew/{crewId}/shift:
+    $ref: ./paths/shift-planner.yaml#/shift
+  /crew/{crewId}/shift/transform:
+    $ref: ./paths/shift-planner.yaml#/shift~1transform
+  /crew/{crewId}/shift/copy:
+    $ref: ./paths/shift-planner.yaml#/shift~1copy
+  /crew/{crewId}/shift-draft:
+    $ref: ./paths/shift-planner.yaml#/shift-draft
+  /crew/{crewId}/shift-draft/transform:
+    $ref: ./paths/shift-planner.yaml#/shift-draft~1transform
+  /crew/{crewId}/shift-draft/publish:
+    $ref: ./paths/shift-planner.yaml#/shift-draft~1publish
+  /crew/{crewId}/shift-template:
+    $ref: ./paths/shift-planner.yaml#/shift-template
+  /crew/{crewId}/shift-template/{templateId}:
+    $ref: ./paths/shift-planner.yaml#/shift-template~1{templateId}
+  /crew/{crewId}/shift-template/{templateId}/apply:
+    $ref: ./paths/shift-planner.yaml#/shift-template~1{templateId}~1apply
+
+  /crew/{crewId}/absence-management/absences:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absences
+  /crew/{crewId}/absence-management/absence-balances:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence-balances
+  /crew/{crewId}/absence-management/absence-days-count:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence-days-count
+  /crew/{crewId}/absence-management/absence/create:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence~1create
+  /crew/{crewId}/absence-management/absence/request:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence~1request
+  /crew/{crewId}/absence-management/absence/grant:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence~1grant
+  /crew/{crewId}/absence-management/absence/reject:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence~1reject
+  /crew/{crewId}/absence-management/absence:
+    $ref: ./paths/absence-management.yaml#/absence-management~1absence
+  /crew/{crewId}/absence-management/entitlements:
+    $ref: ./paths/absence-management.yaml#/absence-management~1entitlements
+  /crew/{crewId}/absence-management/update-entitlement:
+    $ref: ./paths/absence-management.yaml#/absence-management~1update-entitlement
+  /crew/{crewId}/absence-management/types:
+    $ref: ./paths/absence-management.yaml#/absence-management~1types
+
+  /crew/{crewId}/salary-export:
+    $ref: ./paths/salary-export.yaml#/salary-export
+  /crew/{crewId}/salary-export-configurations:
+    $ref: ./paths/salary-export.yaml#/salary-export-configurations
+  /crew/{crewId}/spreadsheet-export:
+    $ref: ./paths/salary-export.yaml#/spreadsheet-export
+
+  /prices/calculate:
+    $ref: ./paths/subscription.yaml#/prices~1calculate
+  /prices/config:
+    $ref: ./paths/subscription.yaml#/prices~1config
+  /subscription/create:
+    $ref: ./paths/subscription.yaml#/subscription~1create
+
+  /server-time:
+    $ref: ./paths/server-time.yaml#/server-time
+
+  /crew/{crewId}/workforce-management/files:
+    $ref: ./paths/files.yaml#/files
+  /crew/{crewId}/workforce-management/files/{fileId}:
+    $ref: ./paths/files.yaml#/files~1{fileId}
+
+components:
+  schemas:
+    $ref: ./components/schemas.yaml
+  securitySchemes:
+    $ref: ./components/securitySchemes.yaml
